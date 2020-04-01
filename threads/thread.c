@@ -63,6 +63,10 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+/* modified */
+static struct list sleeping_thread;        /* list of sleeping thread */
+static int64_t awake_thread;               /* thread which will wake up next */
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -109,6 +113,9 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+
+	/* modified */
+	list_init (&sleeping_thread);   /* initialize sleeping_thread */
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
