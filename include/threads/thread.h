@@ -99,6 +99,9 @@ struct thread {
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
+
+	/* Reimplemented */
+	int64_t wakeup_tick;                /* time for wake up thread */
 };
 
 /* If false (default), use round-robin scheduler.
