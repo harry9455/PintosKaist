@@ -93,8 +93,11 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+
+	/* modified */
+	/* To avoid busy waiting, use thread_sleep instead of thread_yield */
+	int64_t wakeup_ticks = start + ticks;
+	thread_sleep(wakeup_ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -125,6 +128,8 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
+	/* modified */
+	thread_wakeup(ticks);   // wake up thread when interrupt
 	thread_tick ();
 }
 

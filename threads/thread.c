@@ -65,7 +65,6 @@ static tid_t allocate_tid (void);
 
 /* modified */
 static struct list sleeping_thread;        /* list of sleeping thread */
-static int64_t awake_thread;               /* thread which will wake up next */
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -313,6 +312,70 @@ thread_yield (void) {
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+/* modified */
+/* Instead of yield the CPU, block thread */
+void thread_sleep (int64_t tick)
+{
+	struct thread *curr; 
+	curr = thread_current();
+	enum intr_level old_level;
+        old_level = intr_disable();  // do not interrupt
+
+	ASSERT(curr != idle_thread);
+
+	curr->wakeup_tick = tick;
+
+	/* store and sort in the order of wakeup early */	
+	list_insert_ordered(&sleeping_thread, &curr->elem, lesstick, NULL);
+	thread_block();  // block the thread until unblock it
+
+	intr_set_level(old_level);  // allow the interrupt
+}
+
+/* lesstick fuction for list_insert ordered(...) above
+ * check thread with a wakeup ealier than thread with b */
+static bool lesstick (const struct list_elem * a, const struct list_elem * b, void * aux UNUSED)
+{
+    const struct thread *curr = list_entry(a, struct thread, elem);
+    const struct thread *comp = list_entry(b, struct thread, elem);
+
+    /* low wakeup_tick means wake up ealry */
+    if (curr->wakeup_tick < comp->wakeup_tick)
+	    return true;
+    /* higher priority thread wake up first when wakeup_tick is same */
+    else if (curr->wakeup_tick == comp->wakeup_tick)
+    {
+	    if (curr->priority > comp->priority)
+		   return true;
+	    else
+		    return false;
+    }
+    else
+	    return false;
+}
+
+/* Wake up thread by unblocking the sleeping thread */
+void thread_wakeup (int64_t tick)
+{
+	struct thread *t;
+	struct list_elem *e;
+	e = list_begin(&sleeping_thread);  // first wake up thread
+	
+	/* wake up all thread in sleeping_thread after tick */
+	while (e != list_end(&sleeping_thread))
+	{
+		e = list_begin(&sleeping_thread);
+		t = list_entry(e, struct thread, elem);
+		if (tick >= t->wakeup_tick)
+		{
+			list_pop_front(&sleeping_thread);
+			thread_unblock(t);
+		}
+		else
+			break;
+	}
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
