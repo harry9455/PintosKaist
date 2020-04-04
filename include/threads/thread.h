@@ -100,8 +100,12 @@ struct thread {
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
 
-	/* Reimplemented */
+	/* modified */
 	int64_t wakeup_tick;                /* time for wake up thread */
+	int initial_priority;               // store initial priority to initialize after priority donation
+	struct lock *waiting_lock;          // address of waiting lock of thread 
+	struct list all_locks;              // For multiple donation, list of all holding locks of thread
+	struct list_elem all_locks_elem;    // For multiple donation, list element of all_locks
 };
 
 /* If false (default), use round-robin scheduler.
@@ -130,8 +134,13 @@ void thread_yield (void);
 
 /* modified */
 void thread_sleep (int64_t tick);
-static bool lesstick (const struct list_elem *a, const struct list_elem *b, void * aux UNUSED);
+bool lesstick (const struct list_elem *a, const struct list_elem *b, void * aux UNUSED);
 void thread_wakeup (int64_t tick);
+bool compare_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+void preempt_thread (void);
+//void priority_donation (void);
+//void priority_refresh (void);
+//void remove_lock (struct lock *lock);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
