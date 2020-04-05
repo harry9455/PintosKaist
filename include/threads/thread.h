@@ -110,10 +110,12 @@ struct thread {
 
 	/* modified */
 	int64_t wakeup_tick;                /* time for wake up thread */
-	int initial_priority;               // store initial priority to initialize after priority donation
-	struct lock *waiting_lock;          // address of waiting lock of thread 
-	struct list all_locks;              // For multiple donation, list of all holding locks of thread
-	struct list_elem all_locks_elem;    // For multiple donation, list element of all_locks
+	int initial_priority;               /* store initial priority to initialize after priority donation */
+	struct lock *waiting_lock;          /* address of waiting lock of thread*/
+	struct list all_locks;              /* For multiple donation, list of all holding locks of thread */
+	struct list_elem all_locks_elem;    /* For multiple donation, list element of all_locks */
+	int nice;                           /* For advanced scheduler, nice value of thread */
+	int recent_cpu;                     /* For advanced scheduler, recent CPU time */
 };
 
 /* If false (default), use round-robin scheduler.
@@ -146,9 +148,14 @@ bool lesstick (const struct list_elem *a, const struct list_elem *b, void * aux 
 void thread_wakeup (int64_t tick);
 bool compare_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 void preempt_thread (void);
-//void priority_donation (void);
-//void priority_refresh (void);
-//void remove_lock (struct lock *lock);
+void priority_donation (void);
+void priority_refresh (void);
+void remove_lock (struct lock *lock);
+void mlfqs_priority (struct thread *t);
+void mlfqs_recent_cpu (struct thread *t);
+void mlfqs_load_avg (void);
+void mlfqs_increment (void);
+void mlfqs_recalc (void);
 
 int thread_get_priority (void);
 void thread_set_priority (int);

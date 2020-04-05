@@ -128,9 +128,20 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
-	/* modified */
-	thread_wakeup(ticks);   // wake up thread when interrupt
 	thread_tick ();
+
+	/* modified */
+	/* For advanced scheduler, when timer_interrupt occurs, increment recent_cpu, calculate load_avg, recent_cpu, priority in every second, and calculate priority per 4 ticks */
+	if (thread_mlfqs)
+	{
+		mlfqs_increment();
+		if (ticks % 4 == 0)
+			mlfqs_priority(thread_current());
+		if (ticks % 100 == 0)
+			mlfqs_recalc();
+	}
+
+	thread_wakeup(ticks);   // wake up thread when interrupt
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
