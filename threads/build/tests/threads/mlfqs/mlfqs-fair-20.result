@@ -1,0 +1,24 @@
+FAIL
+Some tick counts were missing or differed from those expected by more than 20.
+thread   actual <-> expected explanation
+------ -------- --- -------- ----------------------------------------
+     0      477 >>> 152      Too big, by 305.
+     1      353 >>> 152      Too big, by 181.
+     2      312 >>> 152      Too big, by 140.
+     3      297 >>> 152      Too big, by 125.
+     4      293 >>> 152      Too big, by 121.
+     5      288 >>> 152      Too big, by 116.
+     6      289 >>> 152      Too big, by 117.
+     7      273 >>> 152      Too big, by 101.
+     8      273 >>> 152      Too big, by 101.
+     9      153  =  152      
+    10        0 <<< 148      Too small, by 128.
+    11        0 <<< 148      Too small, by 128.
+    12        0 <<< 148      Too small, by 128.
+    13        0 <<< 148      Too small, by 128.
+    14        0 <<< 148      Too small, by 128.
+    15        0 <<< 148      Too small, by 128.
+    16        0 <<< 148      Too small, by 128.
+    17        0 <<< 148      Too small, by 128.
+    18        0 <<< 148      Too small, by 128.
+    19        0 <<< 148      Too small, by 128.

@@ -22,6 +22,7 @@ test_priority_sema (void)
 
   sema_init (&sema, 0);
   thread_set_priority (PRI_MIN);
+  /* modified */
   for (i = 0; i < 10; i++) 
     {
       int priority = PRI_DEFAULT - (i + 3) % 10 - 1;
