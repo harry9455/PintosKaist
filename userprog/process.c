@@ -204,6 +204,12 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+
+	// for debugging
+	while(1) {
+		thread_yield();
+	};
+
 	return -1;
 }
 
@@ -316,6 +322,40 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
 
+// implement stack
+#define MAX_STACK_SIZE 100
+
+int stack[MAX_STACK_SIZE];
+int top = -1;
+
+int isEmpty() {
+	if (top < 0)
+		return true;
+	else
+		return false;
+}
+
+int isFull() {
+	if (top >= MAX_STACK_SIZE - 1)
+		return true;
+	else
+		return false;
+}
+
+void push (int N) {
+	if (isFull() != true)
+		stack[++top] = N;
+	else
+		printf("full stack");
+}
+
+int pop() {
+	if (isEmpty() != true)
+		return stack[top--];
+	else
+		printf("empty stack");
+}
+
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
@@ -329,14 +369,39 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	// implemented
+	char *ptr;
+	char *save_ptr;
+	int argc = 1;
+        int64_t argvaddr[MAX_STACK_SIZE];
+	char * argv[MAX_STACK_SIZE];
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
+	
+	// modified
+	// parsing argument of file_name
+	ptr = palloc_get_page(0);
+	if (ptr == NULL)
+		goto done;
+	strlcpy(ptr, file_name, PGSIZE);
+	argv[0] = strtok_r (ptr, " ", &save_ptr);
+	while(1) {
+		argv[argc] =  strtok_r (NULL, " ", &save_ptr);
+		if (argv[argc] == NULL)
+			break;
+		argc++;
+	}
 
 	/* Open executable file. */
-	file = filesys_open (file_name);
+
+	// modified
+	//file = filesys_open (file_name);
+	file = filesys_open (argv[0]);
+
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
@@ -408,7 +473,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	/* Set up stack. */
-	if (!setup_stack (if_))
+	if (!setup_stacks (if_, argv, argc))
 		goto done;
 
 	/* Start address. */
@@ -624,7 +689,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
 static bool
-setup_stack (struct intr_frame *if_) {
+setup_stacks (struct intr_frame *if_, char * argv, int argc) {
 	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
@@ -632,6 +697,43 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+	uint64_t * argvaddr[MAX_STACK_SIZE];
+	
+	// argv[i][...]
+	for (i = argc - 1; i >= 0; i--) {
+		if_->rsp -= (strlen(argv[i]) + 1);
+		argvaddr[i] = if_->rsp;
+	        memcpy(if_->rsp, argv[i], strlen(argv[i] + 1));
+	}
+
+	// word-align
+	while (((if_->rsp << 28) != (0x8 << 28)) && (((if_->rsp) << 28) != (0x0 << 28)))
+	{
+		if_->rsp -= 1;
+	}
+
+	// argv[argc] = NULL
+	if_->rsp -= 8;
+	*(int *)(if_->rsp) = 0;
+
+	// argv[i]
+	for (i = argc - 1; i >= 0; i--) {
+		if_->rsp -= 8;
+		*(uint64_t *)(if_->rsp) = argvaddr[i];
+	}
+
+	// point %rsi to argv, set %rdi to argc
+	if_->R->rsi = if_->rsp;
+	if_->R->rdi = argc;
+
+	// return address
+	if_->rsp -= 8;
+	*(int *) (if_->rsp) = 0;
+
+	printf("debug");
+	uintptr_t ofs = if_->rsp;
+	int byte_size = USER_STACK - ofs;
+	hex_dump(ofs, if_->rsp, byte_size, true);
 
 	return success;
 }
