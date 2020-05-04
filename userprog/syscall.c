@@ -166,7 +166,7 @@ void exit(int status) {
 // execute the process whose name is given in cmd_line
 int exec(const char *cmd_line) {
 	printf("exec debug\n");
-	process_exec(cmd_line);
+	return process_exec(cmd_line);
 }	
 
 int wait(pid_t pid) {

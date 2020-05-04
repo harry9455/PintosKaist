@@ -632,9 +632,9 @@ setup_stack (struct intr_frame *if_) {
 // Modification version of setup_stack to passing argument
 static bool
 setup_stacks (struct intr_frame *if_, char ** argv, int argc) {
-	uint8_t *kpage;
-	bool success = false;
-	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
+	//uint8_t *kpage;
+	bool success = true;
+	//void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
 	uint64_t * argvaddr[MAX_STACK_SIZE];
 
@@ -651,8 +651,9 @@ setup_stacks (struct intr_frame *if_, char ** argv, int argc) {
 		}
 	}
 	*/
+	//success = setup_stack(if_);
 
-	if_->rsp = USER_STACK;
+	if (!setup_stack(if_)) return false;
 
 	// argv[i][...]
 	for (int i = argc - 1; i >= 0; i--) {
