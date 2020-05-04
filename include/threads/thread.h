@@ -98,6 +98,10 @@ struct thread {
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
+
+	// modified
+	int exit_code;                      /* store the status of exit() */
+	struct file * fd_table[128];              /* file descriptor table, maximum # of file is 128 per process */
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */

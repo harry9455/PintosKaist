@@ -724,6 +724,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->all_locks);
 	t->nice = NICE_DEFAULT;
 	t->recent_cpu = RECENT_CPU_DEFAULT;
+
+#ifdef USERPROG
+	/* initialize file descriptor table with NULL */
+	for (int i = 0; i < 128; i++) {
+		t->fd_table[i] = NULL;
+	}
+#endif
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

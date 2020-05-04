@@ -206,10 +206,10 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       implementing the process_wait. */
 
 	// for debugging
+	
 	while(1) {
-		thread_yield();
 	};
-
+	
 	return -1;
 }
 
@@ -221,6 +221,13 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+
+	// close all opened file when exit the process
+	for (int i = 3; i < 128; i++) {
+		if (curr->fd_table[i] != NULL) {
+			file_close(curr->fd_table[i]);
+		}
+	}
 
 	process_cleanup ();
 }
@@ -322,9 +329,13 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
 
+// modified
+static bool setup_stacks (struct intr_frame *if_, char ** argv, int argc);
+
 // implement stack
 #define MAX_STACK_SIZE 100
 
+/*
 int stack[MAX_STACK_SIZE];
 int top = -1;
 
@@ -355,6 +366,7 @@ int pop() {
 	else
 		printf("empty stack");
 }
+*/
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP
@@ -373,7 +385,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *ptr;
 	char *save_ptr;
 	int argc = 1;
-        int64_t argvaddr[MAX_STACK_SIZE];
 	char * argv[MAX_STACK_SIZE];
 
 	/* Allocate and activate page directory. */
@@ -389,6 +400,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	strlcpy(ptr, file_name, PGSIZE);
 	argv[0] = strtok_r (ptr, " ", &save_ptr);
+
 	while(1) {
 		argv[argc] =  strtok_r (NULL, " ", &save_ptr);
 		if (argv[argc] == NULL)
@@ -473,12 +485,14 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	/* Set up stack. */
+	//if (!setup_stack(if_))
 	if (!setup_stacks (if_, argv, argc))
 		goto done;
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
+	printf("daet nya?\n");
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
@@ -615,6 +629,71 @@ setup_stack (struct intr_frame *if_) {
 	return success;
 }
 
+// Modification version of setup_stack to passing argument
+static bool
+setup_stacks (struct intr_frame *if_, char ** argv, int argc) {
+	uint8_t *kpage;
+	bool success = false;
+	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
+
+	uint64_t * argvaddr[MAX_STACK_SIZE];
+
+	//kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+	
+	/*
+	if (kpage != NULL) {
+		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
+		if (success) {
+			if_->rsp = USER_STACK;
+		}
+		else {
+			palloc_free_page (kpage);
+		}
+	}
+	*/
+
+	if_->rsp = USER_STACK;
+
+	// argv[i][...]
+	for (int i = argc - 1; i >= 0; i--) {
+		if_->rsp -= (strlen(argv[i]) + 1);
+		argvaddr[i] = if_->rsp;
+	        memcpy(if_->rsp, argv[i], strlen(argv[i] + 1));
+	}
+
+	// word-align
+	while (((if_->rsp & 0xf) != 0x8) && (((if_->rsp) & 0xf) != 0x0))
+	{
+		if_->rsp -= 1;
+	}
+
+	// argv[argc] = NULL
+	if_->rsp -= 8;
+
+	*(int *)(if_->rsp) = 0;
+
+	// argv[i]
+	for (int i = argc - 1; i >= 0; i--) {
+		if_->rsp -= 8;
+		*(uint64_t *)(if_->rsp) = argvaddr[i];
+	}
+
+	// point %rsi to argv, set %rdi to argc
+	if_->R.rsi = if_->rsp;
+	if_->R.rdi = argc;
+
+	// return address
+	if_->rsp -= 8;
+	*(int *) (if_->rsp) = 0;
+
+	printf("debug start\n");
+	uintptr_t ofs = if_->rsp;
+	int byte_size = USER_STACK - ofs;
+	hex_dump(ofs, if_->rsp, byte_size, true);
+
+	return success;
+}
+
 /* Adds a mapping from user virtual address UPAGE to kernel
  * virtual address KPAGE to the page table.
  * If WRITABLE is true, the user process may modify the page;
@@ -689,7 +768,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
 static bool
-setup_stacks (struct intr_frame *if_, char * argv, int argc) {
+setup_stack (struct intr_frame *if_) {
 	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
@@ -697,43 +776,6 @@ setup_stacks (struct intr_frame *if_, char * argv, int argc) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-	uint64_t * argvaddr[MAX_STACK_SIZE];
-	
-	// argv[i][...]
-	for (i = argc - 1; i >= 0; i--) {
-		if_->rsp -= (strlen(argv[i]) + 1);
-		argvaddr[i] = if_->rsp;
-	        memcpy(if_->rsp, argv[i], strlen(argv[i] + 1));
-	}
-
-	// word-align
-	while (((if_->rsp << 28) != (0x8 << 28)) && (((if_->rsp) << 28) != (0x0 << 28)))
-	{
-		if_->rsp -= 1;
-	}
-
-	// argv[argc] = NULL
-	if_->rsp -= 8;
-	*(int *)(if_->rsp) = 0;
-
-	// argv[i]
-	for (i = argc - 1; i >= 0; i--) {
-		if_->rsp -= 8;
-		*(uint64_t *)(if_->rsp) = argvaddr[i];
-	}
-
-	// point %rsi to argv, set %rdi to argc
-	if_->R->rsi = if_->rsp;
-	if_->R->rdi = argc;
-
-	// return address
-	if_->rsp -= 8;
-	*(int *) (if_->rsp) = 0;
-
-	printf("debug");
-	uintptr_t ofs = if_->rsp;
-	int byte_size = USER_STACK - ofs;
-	hex_dump(ofs, if_->rsp, byte_size, true);
 
 	return success;
 }
