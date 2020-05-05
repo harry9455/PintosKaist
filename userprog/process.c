@@ -27,6 +27,9 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
+// implementes
+#define MAX_STACK_SIZE 256
+
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -164,6 +167,15 @@ int
 process_exec (void *f_name) {
 	char *file_name = f_name;
 	bool success;
+	
+	// implemented
+	/*
+	char *ptr;
+	char *save_ptr;
+	int argc = 1;
+	char * argv[MAX_STACK_SIZE];
+	uint64_t * argvaddr[MAX_STACK_SIZE];
+	*/
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -176,8 +188,27 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
+	// modified
+	// parsing argument of f_name
+	/*
+	strlcpy(ptr, f_name, PGSIZE);
+
+	argv[0] = strtok_r ((char *) f_name, " ", &save_ptr);
+
+	if (argv[0] == NULL)
+		return -1;
+
+	while(1) {
+		argv[argc] = strtok_r (NULL, " ", save_ptr);
+		if (argv[argc] == NULL)
+			break;
+		argc++;
+	}
+	*/
+
 	/* And then load the binary */
 	success = load (file_name, &_if);
+	//success = load (ptr, &_if);
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -206,10 +237,11 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       implementing the process_wait. */
 
 	// for debugging
-	
+	/*	
 	while(1) {
 	};
-	
+	*/
+
 	return -1;
 }
 
@@ -330,10 +362,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		bool writable);
 
 // modified
-static bool setup_stacks (struct intr_frame *if_, char ** argv, int argc);
-
-// implement stack
-#define MAX_STACK_SIZE 100
+//static bool setup_stacks (struct intr_frame *if_, char ** argv, int argc);
 
 /*
 int stack[MAX_STACK_SIZE];
@@ -382,11 +411,13 @@ load (const char *file_name, struct intr_frame *if_) {
 	int i;
 
 	// implemented
+	/*
 	char *ptr;
 	char *save_ptr;
 	int argc = 1;
 	char * argv[MAX_STACK_SIZE];
-
+	uint64_t * argvaddr[MAX_STACK_SIZE];
+	*/
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
@@ -395,10 +426,11 @@ load (const char *file_name, struct intr_frame *if_) {
 	
 	// modified
 	// parsing argument of file_name
+	/*
 	ptr = palloc_get_page(0);
 	if (ptr == NULL)
 		goto done;
-	strlcpy(ptr, file_name, PGSIZE);
+	strlcpy(ptr, file_name, strlen(file_name) + 1);      //PGSIZE -> strlen...
 	argv[0] = strtok_r (ptr, " ", &save_ptr);
 
 	while(1) {
@@ -407,12 +439,13 @@ load (const char *file_name, struct intr_frame *if_) {
 			break;
 		argc++;
 	}
+	*/
 
 	/* Open executable file. */
 
 	// modified
-	//file = filesys_open (file_name);
-	file = filesys_open (argv[0]);
+	file = filesys_open (file_name);
+	//file = filesys_open (argv[0]);
 
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
@@ -485,17 +518,56 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	/* Set up stack. */
-	//if (!setup_stack(if_))
-	if (!setup_stacks (if_, argv, argc))
+	if (!setup_stack(if_))
+	//if (!setup_stacks (if_, argv, argc))
 		goto done;
 
+	//success = true;
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	printf("daet nya?\n");
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	/*	
+	if (success) {
+		// argv[i][...]
+		for (int i = argc - 1; i >= 0; i--) {
+			if_->rsp -= (strlen(argv[i]) + 1);
+			argvaddr[i] = if_->rsp;
+			memcpy(if_->rsp, argv[i], strlen(argv[i] + 1));
+		}
 
+		// word-align
+		while (((if_->rsp & 0xf) != 0x8) && (((if_->rsp) & 0xf) != 0x0))
+		{
+			if_->rsp -= 1;
+		}
+
+		// argv[argc] = NULL
+		if_->rsp -= 8;
+
+		*(int *)(if_->rsp) = 0;
+
+		// argv[i]
+		for (int i = argc - 1; i >= 0; i--) {
+			if_->rsp -= 8;
+			*(uint64_t *)(if_->rsp) = argvaddr[i];
+		}
+
+		// point %rsi to argv, set %rdi to argc
+		if_->R.rsi = if_->rsp;
+		if_->R.rdi = argc;
+
+		// return address
+		if_->rsp -= 8;
+		*(int *)(if_->rsp) = 0;
+
+		printf("debug start\n");
+		uintptr_t ofs = if_->rsp;
+		int byte_size = USER_STACK - ofs;
+		hex_dump(ofs, if_->rsp, byte_size, true);
+	}
+	*/
 	success = true;
 
 done:
@@ -630,6 +702,7 @@ setup_stack (struct intr_frame *if_) {
 }
 
 // Modification version of setup_stack to passing argument
+/*
 static bool
 setup_stacks (struct intr_frame *if_, char ** argv, int argc) {
 	//uint8_t *kpage;
@@ -639,7 +712,7 @@ setup_stacks (struct intr_frame *if_, char ** argv, int argc) {
 	uint64_t * argvaddr[MAX_STACK_SIZE];
 
 	//kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-	
+*/	
 	/*
 	if (kpage != NULL) {
 		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
@@ -652,7 +725,7 @@ setup_stacks (struct intr_frame *if_, char ** argv, int argc) {
 	}
 	*/
 	//success = setup_stack(if_);
-
+/*
 	if (!setup_stack(if_)) return false;
 
 	// argv[i][...]
@@ -694,7 +767,7 @@ setup_stacks (struct intr_frame *if_, char ** argv, int argc) {
 
 	return success;
 }
-
+*/
 /* Adds a mapping from user virtual address UPAGE to kernel
  * virtual address KPAGE to the page table.
  * If WRITABLE is true, the user process may modify the page;

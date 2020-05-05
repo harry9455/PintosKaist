@@ -129,7 +129,7 @@ syscall_handler (struct intr_frame *f) {
 	}
 	
 	//printf ("system call!\n");
-	thread_exit ();
+	//thread_exit ();
 }
 
 // check user memory access
